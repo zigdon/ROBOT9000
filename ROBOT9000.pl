@@ -136,7 +136,7 @@ sub event_loop {
                 logmsg "Too quiet.  Ping?";
                 sleep 1;
 
-                if ( -x $config->{fortune_command} ) {
+                if ( $config->{fortune_command} and -x $config->{fortune_command} ) {
                     $irc_conn->privmsg( $config->{irc_chan}, $_ )
                       foreach ( "It's too quiet:",
                         split /\n/, `$config->{fortune_command}` );
