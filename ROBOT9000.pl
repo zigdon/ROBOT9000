@@ -335,7 +335,7 @@ sub irc_on_connect {
     $self->privmsg( "nickserv", "identify $config->{irc_pass}" );
 
     sleep 2;
-    $irc_conn->names;
+    $irc_conn->names( $config->{irc_chan} );
 }
 
 sub irc_on_notice {
