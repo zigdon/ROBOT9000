@@ -1,20 +1,19 @@
 ---
 common_file: ./words.lst
-db_name: xkcd
-db_pass: ""
-db_user: moderator
-home: /home/zigdon/lib/xkcd
+db_name: databasename
+db_pass: databasepass
+db_user: databaseuser
+home: /path/to/working/directory
 irc_chan: '#xkcd-signal'
 irc_name: I AM MODERATOR
 irc_nick: moderator
-irc_pass: ROBOT9000
+irc_pass: sekrit
 irc_server: irc.foonetic.net
-irc_username: zigdon-moderator
+irc_username: username
 logfile: ./robot9000.log
 signal_ratio: 0.1
 timeout_limit: 31536000
 fortune_time: 60
 auth:
-  zigdon: 'zigdon@hide-5730726C.dodgubishi.com'
-  xkcd: 'xkcd@E5AF8C3B.D109E005.42CB40AB.IP'
+  nick: 'user@example.com'
 

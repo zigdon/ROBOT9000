@@ -74,17 +74,18 @@ my %nick_changes;
 my %common_words;
 my %sql;
 my @lookup_queue;
+my $paused;
 
 # what modes are used to deop/op?
 my %op_table = ( "%" => "h", "@" => "o", "~" => "q", "&" => "a" );
 my %rev_op_table = reverse %op_table;
 
 # connect to the IRC server and the database
-my ( $irc, $irc_conn, $dbh ) = &setup(@ARGV ? 0 : 1);
+my ( $irc, $irc_conn, $dbh ) = &setup( @ARGV ? 0 : 1 );
 
-if (@ARGV) {  # we're only loading an existing log file, not actually running
-  print "Loading log files...\n";
-  &load_log;
+if (@ARGV) {    # we're only loading an existing log file, not actually running
+    print "Loading log files...\n";
+    &load_log;
 }
 
 &event_loop;
@@ -102,7 +103,7 @@ sub event_loop {
         $irc->do_one_loop();
         usleep 50;
 
-        if ( $next_unban and time > $next_unban ) {
+        if ( $next_unban and time > $next_unban and not $paused ) {
             &process_unbans;
         }
 
@@ -111,7 +112,9 @@ sub event_loop {
             $irc_conn->mode( $config->{irc_chan}, "+m" );
 
             while (@lookup_queue) {
-                my @batch = splice( @lookup_queue, 0, $config->{names_request_size} || 5, () );
+                my @batch =
+                  splice( @lookup_queue, 0, $config->{names_request_size} || 5,
+                    () );
                 logmsg "Looking up hostmasks... ", join ", ", @batch;
                 $irc_conn->userhost(@batch);
                 usleep 250;
@@ -130,13 +133,14 @@ sub event_loop {
             if ( time - $last_public > $config->{fortune_time} + 300 ) {
                 logmsg "Seems like we're not connected. restarting";
                 exit;
-            }
-            elsif ( time - $last_public > $config->{fortune_time} ) {
+            } elsif ( time - $last_public > $config->{fortune_time} ) {
                 $irc_conn->userhost( $config->{irc_nick} );
                 logmsg "Too quiet.  Ping?";
                 sleep 1;
 
-                if ( $config->{fortune_command} and -x $config->{fortune_command} ) {
+                if ( $config->{fortune_command}
+                    and -x $config->{fortune_command} )
+                {
                     $irc_conn->privmsg( $config->{irc_chan}, $_ )
                       foreach ( "It's too quiet:",
                         split /\n/, `$config->{fortune_command}` );
@@ -155,8 +159,7 @@ sub process_unbans {
         if ( $bantype eq 'v' ) {
             $irc_conn->mode( $config->{irc_chan}, "+v", $nick );
             $nicks{$nick} = "+" unless $nicks{$nick};
-        }
-        else {
+        } else {
             $irc_conn->mode( $config->{irc_chan}, "+v$op_table{$bantype}",
                 $nick, $nick );
             $nicks{$nick} = $bantype;
@@ -362,8 +365,7 @@ sub irc_on_msg {
     logmsg "PRIVMSG $nick($nicks{$nick}): $msg @args";
     if ( lc $msg eq 'version' ) {
         $self->privmsg( $nick, VERSION );
-    }
-    elsif ( lc $msg eq 'timeout' ) {
+    } elsif ( lc $msg eq 'timeout' ) {
         my ( $timeout, $banned_until );
         if ( $args[0] ) {
             if ( $sql{lookup_mask}->execute( $args[0] ) > 0 ) {
@@ -371,8 +373,7 @@ sub irc_on_msg {
                 $sql{lookup_mask}->finish;
                 ( $timeout, $banned_until ) = &get_timeout($mask);
             }
-        }
-        else {
+        } else {
             ( $timeout, $banned_until ) = &get_timeout( $event->userhost );
         }
 
@@ -386,12 +387,10 @@ sub irc_on_msg {
                     "Currently muted, can speak again in "
                       . &timeout_to_text( $banned_until - time ) );
             }
-        }
-        else {
+        } else {
             $self->privmsg( $nick, "No timeout found" );
         }
-    }
-    elsif (
+    } elsif (
         (
             exists $config->{auth}{ lc $nick }
             and $event->userhost =~ /$config->{auth}{ lc $nick }/
@@ -403,21 +402,17 @@ sub irc_on_msg {
         if ( $msg eq 'quit' ) {
             $self->privmsg( $nick, "Quitting" );
             exit;
-        }
-        elsif ( $msg eq 'msg' and exists $config->{auth}{ lc $nick } ) {
+        } elsif ( $msg eq 'msg' and exists $config->{auth}{ lc $nick } ) {
             $self->privmsg( $nick, "Ok - sending $args[0]: @args[1..$#args]" );
             $self->privmsg( $args[0], join " ", @args[ 1 .. $#args ] );
             logmsg "Sending MSG to $args[0]: @args[1..$#args]";
-        }
-        elsif ( $msg eq 'unban' ) {
+        } elsif ( $msg eq 'unban' ) {
             logmsg "Unbanning $args[0] by command";
             $self->mode( $config->{irc_chan}, "-b", $args[0] );
-        }
-        elsif ( $msg eq 'mode' ) {
+        } elsif ( $msg eq 'mode' ) {
             logmsg "Setting mode @args by command";
             $self->mode( $config->{irc_chan}, @args );
-        }
-        elsif ( $msg eq 'kick' ) {
+        } elsif ( $msg eq 'kick' ) {
             logmsg "Kicking $args[0] by command";
             $self->kick(
                 $config->{irc_chan}, $args[0],
@@ -426,26 +421,22 @@ sub irc_on_msg {
                 $args[ 1 .. $#args ]
                 : "Kick"
             );
-        }
-        elsif ( $msg eq 'fail' and $args[0] =~ /([^!]+)!(\S+)/ ) {
+        } elsif ( $msg eq 'fail' and $args[0] =~ /([^!]+)!(\S+)/ ) {
             logmsg "Failing $1!$2 by command";
             &fail(
                 $self, $1, $2,
                 "Failed by a live moderator",
                 "$nick failed $args[0]: @args[1..$#args]"
             );
-        }
-        elsif ( $msg eq 'nick_re' ) {
+        } elsif ( $msg eq 'nick_re' ) {
             logmsg "Current nick re: $nick_re";
             $self->privmsg( $nick, "Ok, logged" );
-        }
-        elsif ( $msg eq 'names' ) {
+        } elsif ( $msg eq 'names' ) {
             logmsg "Current names: ", join ", ",
               map { "$_($nicks{$_})" } sort keys %nicks;
             $self->privmsg( $nick, "Current names: ",
                 join ", ", map { "$_($nicks{$_})" } sort keys %nicks );
-        }
-        elsif ( $msg eq 'fail' ) {
+        } elsif ( $msg eq 'fail' ) {
             if ( $sql{lookup_mask}->execute( $args[0] ) > 0 ) {
                 my ($mask) = $sql{lookup_mask}->fetchrow_array;
                 $sql{lookup_mask}->finish;
@@ -455,17 +446,21 @@ sub irc_on_msg {
                     "Failed by a live moderator",
                     "$nick failed $args[0]: @args[1..$#args]"
                 );
-            }
-            else {
+            } else {
                 logmsg "Couldn't find mask for $args[0]";
             }
-        }
-        elsif ( $msg eq 'check' ) {
+        } elsif ( $msg eq 'check' ) {
             logmsg "Checking for pending mutes to restore";
             $self->privmsg( $nick, "Ok, processing mutes to restore" );
             &process_unbans;
-        }
-        else {
+        } elsif ( $msg eq 'pause' ) {
+            $self->privmsg( $nick, "Ok, not voicing on join" );
+            $paused = 1;
+        } elsif ( $msg eq 'resume' ) {
+            $self->privmsg( $nick, "Ok, voicing on join" );
+            $paused = 0;
+            &process_unbans;
+        } else {
             foreach (
 "Commands: timeout - query if you're banned, and what your next ban will be",
                 "          timeout <nick> - same, for someone else",
@@ -474,14 +469,15 @@ sub irc_on_msg {
                 "          kick <nick> <msg> - kick someone",
 "          names - list the currently known privs of users in channel",
 "          fail <nick> <msg> - have the moderator manually silence <nick>",
-                "          version        - report current version",
+                "          version - report current version",
+                "          pause   - stop granting voice",
+                "          resume  - resume granting voice",
               )
             {
                 $self->privmsg( $nick, $_ );
             }
         }
-    }
-    else {
+    } else {
         foreach (
 "Commands: timeout <nick> - query if you're banned, and what your next ban will be",
             "          version        - report current version",
@@ -532,8 +528,7 @@ sub irc_on_public {
 
         # kick!
         &fail( $self, $nick, $userhost );
-    }
-    else {
+    } else {
 
         # add it as a new line
         $sql{add_line}->execute($msg);
@@ -638,8 +633,7 @@ sub fail {
         $self->notice( $config->{irc_chan},
             "$nick, you have been muted for $delta_text: $msg" );
         $self->notice( "\@$config->{irc_chan}", $opmsg ) if $opmsg;
-    }
-    elsif ( not $banned_until or $banned_until <= 1 ) {
+    } elsif ( not $banned_until or $banned_until <= 1 ) {
         $self->notice( $config->{irc_chan},
             "$nick, you have been muted for $delta_text." );
         $self->notice( "\@$config->{irc_chan}", $opmsg ) if $opmsg;
@@ -648,15 +642,13 @@ sub fail {
     my $bantype = "v";
     if ( not $nicks{$nick} or $nicks{$nick} eq '+' or $nicks{$nick} eq '1' ) {
         $self->mode( $config->{irc_chan}, "-v", $nick );
-    }
-    else {
+    } else {
         if ( exists $op_table{ $nicks{$nick} } ) {
             logmsg
 "$nick is an operator ($nicks{$nick}) - deopping first (-$op_table{$nicks{$nick}})";
             $self->mode( $config->{irc_chan}, "-v$op_table{$nicks{$nick}}",
                 $nick, $nick );
-        }
-        else {
+        } else {
             logmsg "$nick is an operator ($nicks{$nick}) - can't deop";
             $self->mode( $config->{irc_chan}, "-v", $nick );
         }
@@ -677,8 +669,10 @@ sub fail {
     }
 
     # if someone gets failed while already muted, just punt them
-    if ( $banned_until and $banned_until > 1 and
-         (not defined $msg or $msg ne 'Failed by a live moderator') ) {
+    if (    $banned_until
+        and $banned_until > 1
+        and ( not defined $msg or $msg ne 'Failed by a live moderator' ) )
+    {
         $self->kick( $config->{irc_chan}, $nick, "Come back later" );
         logmsg "Kicking $nick for getting muted while muted";
     }
@@ -757,12 +751,10 @@ sub irc_on_nick {
                 &fail( $self, $newnick, $userhost,
                     "Failed for changing nicks too often" );
             }
-        }
-        elsif ( $nick_changes{$userhost}[1] > 5 ) {
+        } elsif ( $nick_changes{$userhost}[1] > 5 ) {
             &kick( $self, $newnick );
         }
-    }
-    else {
+    } else {
         $nick_changes{$userhost} = [ time, 1 ];
     }
 
@@ -794,12 +786,11 @@ sub irc_on_joinpart {
         {
             my ( $power, $ban ) = $sql{lookup_user}->fetchrow_array;
             $sql{lookup_user}->finish;
-            unless ($ban) {
+            if ( not $ban and not $paused ) {
                 $irc_conn->mode( $config->{irc_chan}, "+v", $nick );
                 $nicks{$nick} = "+" unless $nicks{$nick};
             }
-        }
-        else {
+        } else {
             $sql{add_user}->execute( time + $config->{welcome_time},
                 $nick, $event->userhost, 0, "v" );
             if ( not $next_unban
@@ -809,8 +800,7 @@ sub irc_on_joinpart {
             }
             $irc_conn->privmsg( $nick, $config->{welcome_msg} );
         }
-    }
-    else {
+    } else {
         delete $nicks{$nick};
         $action = "left";
     }
@@ -894,22 +884,24 @@ sub irc_on_mode {
     return if $event->nick eq $config->{irc_nick};
 
     my ( $mode, @nicks ) = ( $event->args );
-    while ( ( $event->nick eq 'ChanServ' or 
-            ( $nicks{ $event->nick } and $nicks{ $event->nick } =~ /[@&~]/ ) )
+    while (
+        (
+            $event->nick eq 'ChanServ'
+            or ( $nicks{ $event->nick } and $nicks{ $event->nick } =~ /[@&~]/ )
+        )
         and $mode =~ s/([-+])([hoqa])/$1/
-        and my $nick = shift @nicks )
+        and my $nick = shift @nicks
+      )
     {
         if ( $1 eq '+' ) {
             if ( exists $rev_op_table{$2} ) {
                 logmsg "Marking $nick as an op ($2 - $rev_op_table{$2})";
                 $nicks{$nick} = $rev_op_table{$2};
-            }
-            else {
+            } else {
                 logmsg "Marking $nick as an op ($2 - unknown ~)";
                 $nicks{$nick} = "~";
             }
-        }
-        else {
+        } else {
             logmsg "Unmarking $nick as an op ($2 - $rev_op_table{$2})";
             $nicks{$nick} = "+";
         }
