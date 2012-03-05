@@ -307,6 +307,7 @@ sub setup {
         chanoprivsneeded => sub {
             logmsg "Reauthing to nickserv";
             $irc_conn->privmsg( "nickserv", "identify $config->{irc_pass}" );
+            $irc_conn->mode( $config->{irc_nick}, "+B" );
         }
     );
 
@@ -336,6 +337,7 @@ sub irc_on_connect {
 
     logmsg "Authenticating";
     $self->privmsg( "nickserv", "identify $config->{irc_pass}" );
+    $self->mode( $config->{irc_nick}, "+B" );
 
     sleep 2;
     $irc_conn->names( $config->{irc_chan} );
