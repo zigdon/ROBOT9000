@@ -735,6 +735,13 @@ sub irc_on_nick {
     $nicks{$newnick} = $nicks{$oldnick};
     delete $nicks{$oldnick};
 
+    # make sure no one tries to nick to one of the ignored common words
+    if ( exists $common_words{ lc $newnick } ) {
+        $self->kick( $config->{irc_chan}, $newnick,
+            "Please select a different nick." );
+        return;
+    }
+
     # if they're banned, we need to update the table with their new nick
     if ( $sql{update_nick}->execute( $newnick, $userhost ) > 0 ) {
         logmsg "Nick updated in database";
@@ -774,6 +781,14 @@ sub irc_on_joinpart {
 
     my $action;
     if ( $event->{type} eq 'join' ) {
+
+        # make sure no one tries to join as one of the ignored common words
+        if ( exists $common_words{ lc $nick } ) {
+            $self->kick( $config->{irc_chan}, $nick,
+                "Please select a different nick." );
+            return;
+        }
+
         $nicks{$nick} = 1;
         $action = "joined";
 
