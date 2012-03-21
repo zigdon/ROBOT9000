@@ -903,11 +903,11 @@ sub irc_on_mode {
     my ( $mode, @nicks ) = ( $event->args );
 
     if ($mode eq '+R') {
-        $pause = 1;
+        $paused = 1;
         logmsg "join flood detected: not voicing on join."
     }
     if ($mode eq '-R') {
-        $pause = 0;
+        $paused = 0;
         logmsg "join flood released: voicing on join."
     }
 
