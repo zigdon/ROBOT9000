@@ -901,6 +901,16 @@ sub irc_on_mode {
     return if $event->nick eq $config->{irc_nick};
 
     my ( $mode, @nicks ) = ( $event->args );
+
+    if ($mode eq '+R') {
+        $pause = 1;
+        logmsg "join flood detected: not voicing on join."
+    }
+    if ($mode eq '-R') {
+        $pause = 0;
+        logmsg "join flood released: voicing on join."
+    }
+
     while (
         (
             $event->nick eq 'ChanServ'
