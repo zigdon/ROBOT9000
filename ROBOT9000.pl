@@ -737,6 +737,7 @@ sub irc_on_nick {
 
     # make sure no one tries to nick to one of the ignored common words
     if ( exists $common_words{ lc $newnick } ) {
+        $self->mode( $config->{irc_chan}, "+b", "$newnick!*@*" );
         $self->kick( $config->{irc_chan}, $newnick,
             "Please select a different nick." );
         return;
