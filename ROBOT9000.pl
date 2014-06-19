@@ -332,14 +332,14 @@ sub irc_on_connect {
     #warn "irc_on_connect (@_)\n";
     my ( $self, $event ) = @_;
 
-    logmsg "Connected to IRC, joining $config->{irc_chan}";
-    $self->join( $config->{irc_chan} );
-
     logmsg "Authenticating";
     $self->privmsg( "nickserv", "identify $config->{irc_pass}" );
     $self->mode( $config->{irc_nick}, "+B" );
-
     sleep 2;
+
+    logmsg "Connected to IRC, joining $config->{irc_chan}";
+    $self->join( $config->{irc_chan} );
+
     $irc_conn->names( $config->{irc_chan} );
 }
 
