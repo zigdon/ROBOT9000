@@ -509,6 +509,17 @@ sub irc_on_public {
     logmsg "$nick: $msg";
     my $length = length $msg;
 
+    if ( $config->{comic_fail} and uc $msg eq $msg and $msg =~ /^\(#.{10}\) / )
+    {
+        &fail(
+            $self, $nick, $userhost,
+            "Your IRC client is not allowed here",
+            "Microsoft chat comics mode banned"
+        );
+        $self->kick( $config->{irc_chan}, $nick, "Come back later" );
+        return;
+    }
+
     # process the message so that we strip them down
     $msg = &strip($msg);
 
@@ -519,15 +530,6 @@ sub irc_on_public {
             $self, $nick, $userhost,
             "Not enough content",
             "Not enough content: " . length($msg) . " vs $length"
-        );
-        return;
-    }
-
-    if ( $config->{comic_fail} and $msg =~ /^\(#[^)]{10}\) / ) {
-        &fail(
-            $self, $nick, $userhost,
-            "Your IRC client is not allowed here",
-            "Microsoft chat comics mode banned"
         );
         return;
     }
