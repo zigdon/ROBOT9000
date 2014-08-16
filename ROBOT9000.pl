@@ -523,6 +523,15 @@ sub irc_on_public {
         return;
     }
 
+    if ( $config->{comic_fail} and $msg =~ /^\(#[^)]{10}\) / ) {
+        &fail(
+            $self, $nick, $userhost,
+            "Your IRC client is not allowed here",
+            "Microsoft chat comics mode banned"
+        );
+        return;
+    }
+
     # check if the line was already in the DB
     my $res = $sql{lookup_line}->execute($msg);
 
@@ -903,13 +912,13 @@ sub irc_on_mode {
 
     my ( $mode, @nicks ) = ( $event->args );
 
-    if ($mode eq '+R') {
+    if ( $mode eq '+R' ) {
         $paused = 1;
-        logmsg "join flood detected: not voicing on join."
+        logmsg "join flood detected: not voicing on join.";
     }
-    if ($mode eq '-R') {
+    if ( $mode eq '-R' ) {
         $paused = 0;
-        logmsg "join flood released: voicing on join."
+        logmsg "join flood released: voicing on join.";
     }
 
     while (
