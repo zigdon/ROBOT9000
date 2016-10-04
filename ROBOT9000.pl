@@ -566,7 +566,7 @@ sub strip {
     $msg =~ s/^\S+: ?//;
 
     # remove any nicks referred to
-    $msg =~ s/(?:^|\b)(?:$nick_re)(?:\b|$)/ /g if $nick_re;
+    $msg =~ s/(?:^|\W\K)(?:$nick_re)(?=\W|$)/ /g if $nick_re;
 
     # remove control chars
     $msg =~ s/[[:cntrl:]]//g;
